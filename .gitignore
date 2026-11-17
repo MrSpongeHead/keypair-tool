@@ -1,0 +1,18 @@
+# Never commit keys. These patterns stop key files made while testing from being added by accident.
+*.pem
+*.der
+*.key
+*.ppk
+*.pub
+*.jwk.json
+*.p8
+*.p12
+*.pfx
+id_*
+*_private*
+*_public*
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini

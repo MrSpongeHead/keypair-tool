@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- No-network rule: the browser blocks this page from connecting to any server or loading anything from outside this file.
+     Only the code and styles written inside this file can run. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<link rel="icon" href="data:,">
+<title>Key Pair Tool</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#5d6675;--border:#d8dce3;--accent:#2f5bd3;--on-accent:#fff;
+  --rec:#1f8a4c;--good:#2f6fb3;--strong:#5b48c9;--legacy:#b26a00;--danger:#b3261e;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2128;--text:#e6e9ee;--muted:#9aa3b2;--border:#323844;
+  --accent:#7aa2ff;--on-accent:#10141b;--rec:#4cc17e;--good:#6ea8e6;--strong:#a093f0;--legacy:#e0a040;--danger:#ef6b63}}
+*{box-sizing:border-box}
+html{scrollbar-gutter:stable}   /* keep room for the scrollbar so the layout doesn't shift when switching tabs */
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:780px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0 .1em}
+h2{font-size:1.1rem;margin:0 0 8px}
+h3{font-size:.95rem;margin:8px 0 4px}
+.sub,.hint{color:var(--muted)}
+.sub{margin:0 0 16px}
+.hint{font-size:.88rem;margin:4px 0 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+label{display:block;font-weight:600;margin:14px 0 4px}
+label:first-child{margin-top:0}
+label .hint{font-weight:400}
+select,input[type=text]{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+.check{display:flex;gap:8px;align-items:center;font-weight:400}
+.badge{display:flex;gap:10px;align-items:flex-start;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border)}
+.pill{flex:none;display:inline-block;font-size:.78rem;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--on-accent);white-space:nowrap}
+.pill.rec{background:var(--rec)}.pill.good{background:var(--good)}.pill.strong{background:var(--strong)}.pill.legacy{background:var(--legacy)}
+details{margin-top:10px}
+summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.tablewrap{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+button{font:inherit;border:1px solid var(--border);background:var(--card);color:var(--text);padding:7px 12px;border-radius:8px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600;width:100%;padding:11px;margin-top:16px}
+button:disabled{opacity:.55;cursor:default}
+#clear{width:100%;margin-top:8px}
+textarea{width:100%;font:12px/1.4 var(--mono);padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);resize:vertical;white-space:pre;overflow-wrap:normal;overflow-x:auto}
+.row{display:flex;gap:8px;margin:6px 0 14px;flex-wrap:wrap}
+.warn{color:var(--danger);font-weight:600}
+.msg{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);margin-bottom:16px}
+.msg.error{border-color:var(--danger);color:var(--danger)}
+a{color:var(--accent)}
+.foot{margin-top:24px}
+[hidden]{display:none!important}
+.pill.weak{background:var(--danger)}
+.mono{font-family:var(--mono);font-size:.85rem;overflow-wrap:anywhere}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{background:none;border:none;border-bottom:3px solid transparent;border-radius:0;padding:8px 14px;font-weight:600;color:var(--muted);margin-bottom:-1px;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+#keyIn{min-height:9em}
+#keyIn.drag{border-color:var(--accent);outline:2px dashed var(--accent)}
+#cclear{width:100%;margin-top:8px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Key Pair Tool</h1>
+  <p class="sub">Runs entirely in your browser. Keys are never sent anywhere: the page is blocked from making any network connections.
+  <span id="offlineWrap" hidden><a id="offline" href="">Download for offline use</a></span></p>
+  <div id="envError" class="msg error" hidden></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tabGen" aria-selected="true" aria-controls="panelGen">Generate</button>
+    <button class="tab" role="tab" id="tabConv" aria-selected="false" aria-controls="panelConv">Convert or recreate</button>
+  </div>
+
+  <div id="panelGen" role="tabpanel" aria-labelledby="tabGen">
+  <section class="card">
+    <label for="alg">Algorithm</label>
+    <select id="alg"></select>
+    <div id="badge" class="badge"></div>
+    <details><summary>Compare algorithms</summary><div id="compare"></div></details>
+
+    <label for="fmt">Output format</label>
+    <select id="fmt"></select>
+    <p id="fmtNote" class="hint"></p>
+    <label class="check"><input type="checkbox" id="all"> Show all formats for the same key</label>
+
+    <label for="comment">Comment / label <span class="hint">(saved inside OpenSSH and PuTTY keys, and used to name the PEM, DER, JWK and PuTTY files)</span></label>
+    <input type="text" id="comment" value="my-key" autocomplete="off" spellcheck="false">
+
+    <button id="gen" class="primary">Generate key pair</button>
+    <button id="clear" hidden>Clear generated keys from page</button>
+  </section>
+
+  <div id="status" class="msg" hidden></div>
+  <section id="output"></section>
+  </div>
+
+  <div id="panelConv" role="tabpanel" aria-labelledby="tabConv" hidden>
+  <section class="card">
+    <label for="keyIn">Private key <span class="hint">(paste it, open a file, or drop a file here)</span></label>
+    <textarea id="keyIn" spellcheck="false" autocomplete="off" autocapitalize="off"
+      placeholder="-----BEGIN OPENSSH PRIVATE KEY-----, -----BEGIN PRIVATE KEY-----, PuTTY-User-Key-File-3: …, a JWK, or Base64 DER"></textarea>
+    <div class="row"><button id="openFile" type="button">Open file…</button><input type="file" id="fileIn" hidden></div>
+    <p class="hint">Reads PEM (PKCS#8, PKCS#1, SEC1), DER, JWK, OpenSSH and PuTTY .ppk (v2 and v3) keys.
+    Keys protected by a passphrase need it removed first, on a copy.</p>
+    <div id="detected" class="badge" hidden></div>
+
+    <label for="cfmt">Output format</label>
+    <select id="cfmt"></select>
+    <p id="cfmtNote" class="hint"></p>
+    <label class="check"><input type="checkbox" id="call"> Show all formats</label>
+    <label class="check"><input type="checkbox" id="cpriv"> Include the private key in the output (to convert it)</label>
+
+    <label for="ccomment">Comment / label <span class="hint">(filled in from OpenSSH, PuTTY and JWK files when they have one)</span></label>
+    <input type="text" id="ccomment" autocomplete="off" spellcheck="false" placeholder="optional">
+
+    <button id="conv" class="primary" disabled>Recreate public key</button>
+    <button id="cclear" hidden>Clear key and results from page</button>
+  </section>
+
+  <div id="cstatus" class="msg" hidden></div>
+  <section id="coutput"></section>
+  </div>
+
+  <p class="hint">Private keys are output <strong>without a passphrase</strong>. Store them somewhere safe and never share them.
+  Generating a new key always creates a new, different key pair.</p>
+  <p class="hint foot">Key Pair Tool v1.0.0 · <a href="https://github.com/MrSpongeHead/keypair-tool">Source on GitHub</a></p>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const algSel=$("alg"), fmtSel=$("fmt"), allChk=$("all"), commentIn=$("comment"), genBtn=$("gen"), clearBtn=$("clear"),
+      outEl=$("output"), badgeEl=$("badge"), compareEl=$("compare"), fmtNote=$("fmtNote"), statusEl=$("status"), envErr=$("envError");
+
+function rsaParams(bits){return {name:"RSASSA-PKCS1-v1_5",modulusLength:bits,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"};}
+
+const ALGS = {
+  ed25519:{name:"Ed25519",kind:"ed25519",params:{name:"Ed25519"},sec:"128-bit",level:"rec",rating:"Recommended",
+    note:"Fast, small keys and hard to misuse. Not supported by some older systems, services and HSMs.",file:"id_ed25519",ssh:"ssh-ed25519"},
+  p256:{name:"ECDSA P-256",kind:"ecdsa",params:{name:"ECDSA",namedCurve:"P-256"},sec:"128-bit",level:"good",rating:"Good",
+    note:"Very widely supported.",file:"id_ecdsa",ssh:"ecdsa-sha2-nistp256",curve:"nistp256"},
+  p384:{name:"ECDSA P-384",kind:"ecdsa",params:{name:"ECDSA",namedCurve:"P-384"},sec:"192-bit",level:"strong",rating:"Strong",
+    note:"Larger margin than P-256, with broad support.",file:"id_ecdsa",ssh:"ecdsa-sha2-nistp384",curve:"nistp384"},
+  p521:{name:"ECDSA P-521",kind:"ecdsa",params:{name:"ECDSA",namedCurve:"P-521"},sec:"256-bit",level:"strong",rating:"Very strong",
+    note:"Largest margin here, but less widely supported than P-256/P-384.",file:"id_ecdsa",ssh:"ecdsa-sha2-nistp521",curve:"nistp521"},
+  rsa2048:{name:"RSA 2048",kind:"rsa",params:rsaParams(2048),sec:"112-bit",level:"legacy",rating:"Minimum / legacy",
+    note:"Still widely accepted, but the smallest safety margin here. Prefer 3072 or more for new keys.",file:"id_rsa",ssh:"ssh-rsa"},
+  rsa3072:{name:"RSA 3072",kind:"rsa",params:rsaParams(3072),sec:"128-bit",level:"good",rating:"Good",
+    note:"Works almost everywhere at a 128-bit level.",file:"id_rsa",ssh:"ssh-rsa"},
+  rsa4096:{name:"RSA 4096",kind:"rsa",params:rsaParams(4096),sec:"~140-bit (estimate)",level:"strong",rating:"Strong",
+    note:"Most compatible strong option. Slower to generate (can take several seconds) and larger keys.",file:"id_rsa",ssh:"ssh-rsa"}
+};
+
+const FORMATS = {
+  pem:{name:"PEM (PKCS#8 / SPKI)",hint:"Most widely accepted: OpenSSL, web servers and most programming languages."},
+  pkcs1:{name:"PEM (PKCS#1, RSA only)",rsaOnly:true,hint:"Older RSA-specific PEM, for tools that expect \"BEGIN RSA PRIVATE KEY\"."},
+  der:{name:"DER (binary)",hint:"Binary PKCS#8 / SPKI, used by Java and some embedded systems. Shown as Base64; use Download for the binary file."},
+  jwk:{name:"JWK (JSON Web Key)",hint:"For web apps, JWTs, OAuth/OpenID Connect and JavaScript."},
+  openssh:{name:"OpenSSH",hint:"For SSH: put the .pub line in the server's authorized_keys and keep the private file in ~/.ssh."},
+  ppk:{name:"PuTTY (.ppk v3)",hint:"For PuTTY and WinSCP (needs PuTTY 0.75 or later). Unencrypted: add a passphrase in PuTTYgen if needed."}
+};
+function formatHint(f,a,label){
+  let h=FORMATS[f].hint;
+  if(f==="openssh")h+=" Files keep the default name "+a.file+" so SSH finds them automatically. If you already have ~/.ssh/"+a.file+
+    ", rename these files before moving them in (for example "+a.file+"_"+(label||"work")+
+    ") and add an IdentityFile line to ~/.ssh/config, or you'll overwrite your existing key.";
+  return h;
+}
+
+/* ---------- byte helpers ---------- */
+const utf8 = s => new TextEncoder().encode(s);
+function cat(...arrs){const n=arrs.reduce((t,a)=>t+a.length,0),o=new Uint8Array(n);let p=0;for(const a of arrs){o.set(a,p);p+=a.length;}return o;}
+function u32(n){return new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]);}
+const sbytes = b => cat(u32(b.length), b);
+const sstr = s => sbytes(utf8(s));
+function smp(b){let i=0;while(i<b.length&&b[i]===0)i++;b=b.subarray(i);if(b.length&&(b[0]&0x80))b=cat(new Uint8Array([0]),b);return sbytes(b);}
+function trimTrailingZeros(b){let n=b.length;while(n>0&&b[n-1]===0)n--;return b.subarray(0,n);}
+function b64(u8){let s="";for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);}
+function b64uDec(str){str=str.replace(/-/g,"+").replace(/_/g,"/");while(str.length%4)str+="=";const s=atob(str),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
+const hex = u => Array.from(u,x=>x.toString(16).padStart(2,"0")).join("");
+function lineWrap(str,n){return str.match(new RegExp(".{1,"+n+"}","g")).join("\n");}
+function pem(label,der){return `-----BEGIN ${label}-----\n${lineWrap(b64(der),64)}\n-----END ${label}-----\n`;}
+
+/* ---------- file-name label ---------- */
+const DEFAULT_LABEL="my-key";
+// Turns the comment into a safe file-name prefix; "" means "use the standard names".
+function fileLabel(comment){
+  let s=(comment||"").trim();
+  if(!s||s===DEFAULT_LABEL)return "";
+  s=s.replace(/[\/\\:*?"<>|\x00-\x1f\x7f]/g,"-")   // characters Windows (or any OS) won't accept
+     .replace(/\s+/g,"-").replace(/-{2,}/g,"-")
+     .replace(/^[-.]+|[-.\s]+$/g,"");               // no leading dot (hidden file), no trailing dot/space (Windows)
+  s=Array.from(s).slice(0,40).join("").replace(/[-.]+$/,"");   // cap length without splitting characters
+  if(/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(s))s+="-key"; // reserved device names on Windows
+  return s;
+}
+
+/* ---------- minimal DER parsing (for PKCS#1 and reading keys) ---------- */
+function tlv(b,i){
+  if(i+2>b.length)throw new Error("DER data ends early");
+  const tag=b[i];let len=b[i+1],p=i+2;
+  if(len&0x80){const n=len&0x7f;if(n<1||n>4)throw new Error("Bad DER length");len=0;for(let k=0;k<n;k++){if(p>=b.length)throw new Error("DER data ends early");len=len*256+b[p++];}}
+  if(p+len>b.length)throw new Error("DER data ends early");
+  return {tag,start:p,end:p+len};
+}
+function kids(b,node){const out=[];let i=node.start;while(i<node.end){const c=tlv(b,i);out.push(c);i=c.end;}return out;}
+function pkcs8ToPkcs1(b){const c=kids(b,tlv(b,0));if(!c[2]||c[2].tag!==0x04)throw new Error("Unexpected PKCS#8 structure");return b.slice(c[2].start,c[2].end);}
+function spkiToPkcs1(b){const c=kids(b,tlv(b,0));if(!c[1]||c[1].tag!==0x03)throw new Error("Unexpected SPKI structure");return b.slice(c[1].start+1,c[1].end);}
+
+/* ---------- SSH / PuTTY encodings ---------- */
+function sshParts(k){
+  const a=k.a, j=k.jwkPriv, d=b64uDec;
+  if(a.kind==="ed25519"){
+    const pub=d(j.x), seed=d(j.d);
+    return {type:a.ssh, pubBlob:cat(sstr(a.ssh),sbytes(pub)),
+      opensshPriv:cat(sstr(a.ssh),sbytes(pub),sbytes(cat(seed,pub))),
+      ppkPriv:sbytes(trimTrailingZeros(seed))};
+  }
+  if(a.kind==="ecdsa"){
+    const Q=cat(new Uint8Array([4]),d(j.x),d(j.y)), D=d(j.d);
+    return {type:a.ssh, pubBlob:cat(sstr(a.ssh),sstr(a.curve),sbytes(Q)),
+      opensshPriv:cat(sstr(a.ssh),sstr(a.curve),sbytes(Q),smp(D)),
+      ppkPriv:smp(D)};
+  }
+  const n=d(j.n),e=d(j.e),D=d(j.d),p=d(j.p),q=d(j.q),qi=d(j.qi);
+  return {type:"ssh-rsa", pubBlob:cat(sstr("ssh-rsa"),smp(e),smp(n)),
+    opensshPriv:cat(sstr("ssh-rsa"),smp(n),smp(e),smp(D),smp(qi),smp(p),smp(q)),
+    ppkPriv:cat(smp(D),smp(p),smp(q),smp(qi))};
+}
+function sshPublicLine(s,comment){return s.type+" "+b64(s.pubBlob)+(comment?" "+comment:"")+"\n";}
+function opensshPrivate(s,comment){
+  const check=crypto.getRandomValues(new Uint8Array(4));
+  let body=cat(check,check,s.opensshPriv,sstr(comment));
+  const padLen=(8-body.length%8)%8, pad=new Uint8Array(padLen);
+  for(let i=0;i<padLen;i++)pad[i]=i+1;
+  body=cat(body,pad);
+  const blob=cat(utf8("openssh-key-v1\0"),sstr("none"),sstr("none"),sbytes(new Uint8Array(0)),u32(1),sbytes(s.pubBlob),sbytes(body));
+  return "-----BEGIN OPENSSH PRIVATE KEY-----\n"+lineWrap(b64(blob),70)+"\n-----END OPENSSH PRIVATE KEY-----\n";
+}
+async function hmacSha256EmptyKey(msg){
+  // HMAC with a zero-length key (Web Crypto's HMAC import rejects empty keys)
+  const ipad=new Uint8Array(64).fill(0x36), opad=new Uint8Array(64).fill(0x5c);
+  const inner=new Uint8Array(await crypto.subtle.digest("SHA-256",cat(ipad,msg)));
+  return new Uint8Array(await crypto.subtle.digest("SHA-256",cat(opad,inner)));
+}
+async function ppkV3(s,comment){
+  const macData=cat(sstr(s.type),sstr("none"),sstr(comment),sbytes(s.pubBlob),sbytes(s.ppkPriv));
+  const mac=await hmacSha256EmptyKey(macData);
+  const pubL=lineWrap(b64(s.pubBlob),64).split("\n"), privL=lineWrap(b64(s.ppkPriv),64).split("\n");
+  return ["PuTTY-User-Key-File-3: "+s.type,"Encryption: none","Comment: "+comment,
+    "Public-Lines: "+pubL.length,...pubL,"Private-Lines: "+privL.length,...privL,"Private-MAC: "+hex(mac)].join("\n")+"\n";
+}
+function cleanJwk(j){const o={...j};delete o.key_ops;delete o.ext;return o;}
+
+/* ---------- reading existing private keys (Convert tab) ---------- */
+function fail(msg){const e=new Error(msg);e.friendly=true;return e;}
+const PUBLIC_MSG="This is a public key. To convert or recreate keys, paste the private key instead.";
+const ENC_MSG={
+  openssh:"This OpenSSH key is protected by a passphrase, which this page can't remove. On a copy of the file, run: ssh-keygen -p -f <copy> (enter the old passphrase, leave the new one empty), then use that copy.",
+  ppk:"This PuTTY key is protected by a passphrase, which this page can't remove. Open it in PuTTYgen, clear both passphrase boxes, save a copy with \"Save private key\", then use that copy.",
+  pem:"This PEM key is protected by a passphrase, which this page can't remove. Run: openssl pkey -in <key file> -out unencrypted.pem (enter the passphrase), then use unencrypted.pem."
+};
+const unsupported=what=>fail((what.startsWith("?")?"This key uses an algorithm this page doesn't recognise (OID "+what.slice(1)+")."
+  :what+" keys aren't supported here.")+" This page supports Ed25519, ECDSA (P-256, P-384, P-521) and RSA.");
+const b64u=u=>b64(u).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+function b64dec(s){
+  s=s.replace(/\s+/g,"");
+  if(!/^[A-Za-z0-9+/]*={0,2}$/.test(s)||s.length%4===1)throw fail("The key contains invalid Base64 text. It may have been cut off or altered.");
+  const t=atob(s),u=new Uint8Array(t.length);for(let i=0;i<t.length;i++)u[i]=t.charCodeAt(i);return u;
+}
+const unhex=h=>Uint8Array.from(h.match(/../g),x=>parseInt(x,16));
+const eq=(x,y)=>x.length===y.length&&x.every((v,i)=>v===y[i]);
+function stripZeros(b){let i=0;while(i<b.length-1&&b[i]===0)i++;return b.subarray(i);}
+function padLeft(b,n){b=stripZeros(b);if(b.length>n)throw fail("A key value is longer than expected. The file looks damaged.");const o=new Uint8Array(n);o.set(b,n-b.length);return o;}
+const bi=u=>u.length?BigInt("0x"+hex(u)):0n;
+function biBytes(n){let h=n.toString(16);if(h.length%2)h="0"+h;return unhex(h);}
+function modInv(a,m){
+  let r0=((a%m)+m)%m,r1=m,s0=1n,s1=0n;
+  while(r1){const q=r0/r1;[r0,r1]=[r1,r0-q*r1];[s0,s1]=[s1,s0-q*s1];}
+  if(r0!==1n)throw fail("The RSA key's primes are invalid. The file looks damaged.");
+  return ((s0%m)+m)%m;
+}
+
+// DER building
+function derLen(n){if(n<128)return Uint8Array.of(n);const b=[];while(n){b.unshift(n&255);n=Math.floor(n/256);}return Uint8Array.of(0x80|b.length,...b);}
+const der=(tag,...parts)=>{const body=cat(...parts);return cat(Uint8Array.of(tag),derLen(body.length),body);};
+const OID={rsa:"2a864886f70d010101",ec:"2a8648ce3d0201",ed25519:"2b6570"};
+const CURVE_OID={"2a8648ce3d030107":"P-256","2b81040022":"P-384","2b81040023":"P-521"};
+function oidName(h){
+  return {"2b6571":"Ed448","2b656e":"X25519","2b656f":"X448","2a8648ce380401":"DSA","2a864886f70d01010a":"RSA-PSS","2b8104000a":"secp256k1"}[h]
+    ||(h.startsWith("2b24030302080101")?"Brainpool curve":"?"+h);
+}
+const wrapPkcs8=(algId,keyBytes)=>der(0x30,der(0x02,Uint8Array.of(0)),algId,der(0x04,keyBytes));
+function ed25519Pkcs8(seed){if(seed.length!==32)throw fail("An Ed25519 private key must be 32 bytes. This one isn't, so the file looks damaged.");return wrapPkcs8(der(0x30,der(0x06,unhex(OID.ed25519))),der(0x04,seed));}
+const pkcs1ToPkcs8=b=>wrapPkcs8(der(0x30,der(0x06,unhex(OID.rsa)),Uint8Array.of(5,0)),b);
+function sec1ToPkcs8(b){
+  const p=kids(b,tlv(b,0)).find(x=>x.tag===0xa0);
+  if(!p)throw fail("This EC key doesn't say which curve it uses, so it can't be converted.");
+  const o=kids(b,p)[0];
+  if(!o||o.tag!==0x06)throw fail("This EC key uses explicit curve parameters instead of a named curve, which browsers can't import.");
+  return wrapPkcs8(der(0x30,der(0x06,unhex(OID.ec)),der(0x06,b.subarray(o.start,o.end))),b);
+}
+function derType(b){
+  let c;try{const t=tlv(b,0);if(t.tag!==0x30||t.end!==b.length)throw 0;c=kids(b,t);}
+  catch{throw fail("This isn't a valid key: the data couldn't be read.");}
+  const T=c.map(x=>x.tag);
+  if(T[0]===0x02&&T[1]===0x30&&T[2]===0x04)return "pkcs8";
+  if(T[0]===0x30&&T[1]===0x04)return "encrypted";
+  if(T[0]===0x30&&T[1]===0x03)return "public";
+  if(T.length>=9&&T.every(t=>t===0x02))return "pkcs1";
+  if(T.length===2&&T.every(t=>t===0x02))return "public";
+  if(T[0]===0x02&&T[1]===0x04)return "sec1";
+  throw fail("This binary (DER) data isn't a private key format this page recognises.");
+}
+const RSA_IMPORT={name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"};
+function pkcs8Params(b){
+  const top=kids(b,tlv(b,0)),alg=kids(b,top[1]),oid=hex(b.subarray(alg[0].start,alg[0].end));
+  if(oid===OID.rsa)return RSA_IMPORT;
+  if(oid===OID.ed25519)return {name:"Ed25519"};
+  if(oid===OID.ec){
+    const p=alg[1];
+    if(!p||p.tag!==0x06)throw fail("This EC key uses explicit curve parameters instead of a named curve, which browsers can't import.");
+    const c=hex(b.subarray(p.start,p.end));if(!CURVE_OID[c])throw unsupported(oidName(c));
+    return {name:"ECDSA",namedCurve:CURVE_OID[c]};
+  }
+  throw unsupported(oidName(oid));
+}
+function derSource(b,desc){
+  const t=derType(b);
+  if(t==="public")throw fail(PUBLIC_MSG);
+  if(t==="encrypted")throw fail(ENC_MSG.pem);
+  const p8=t==="pkcs8"?b:t==="pkcs1"?pkcs1ToPkcs8(b):sec1ToPkcs8(b);
+  return {pkcs8:p8,params:pkcs8Params(p8),
+    desc:desc||{pkcs8:"DER PKCS#8 private key",pkcs1:"DER PKCS#1 RSA private key",sec1:"DER SEC1 EC private key"}[t]};
+}
+
+// SSH wire format (OpenSSH and PuTTY)
+function sshReader(b){
+  let p=0;const need=n=>{if(p+n>b.length)throw fail("The key data ends too early. The file looks damaged or incomplete.");};
+  return {
+    u32(){need(4);const v=((b[p]<<24)|(b[p+1]<<16)|(b[p+2]<<8)|b[p+3])>>>0;p+=4;return v;},
+    bytes(){const n=this.u32();need(n);const r=b.subarray(p,p+n);p+=n;return r;},
+    str(){return new TextDecoder().decode(this.bytes());},
+    mpint(){const r=this.bytes();if(r.length&&(r[0]&0x80))throw fail("The key contains a negative number. The file looks damaged.");return stripZeros(r);}
+  };
+}
+const SSH_CURVES={nistp256:["P-256",32],nistp384:["P-384",48],nistp521:["P-521",66]};
+function sshTypeCheck(type){
+  if(type==="ssh-ed25519"||type==="ssh-rsa"||/^ecdsa-sha2-nistp(256|384|521)$/.test(type))return;
+  if(type.startsWith("sk-"))throw fail("This is a hardware security key (FIDO) handle. The real private key stays on the device, so it can't be converted.");
+  throw unsupported(type==="ssh-dss"?"DSA":type);
+}
+function ecJwk(curveName,Q,d){
+  const c=SSH_CURVES[curveName];if(!c)throw unsupported(curveName);
+  const [crv,n]=c;
+  if(Q.length!==1+2*n||Q[0]!==4)throw fail("This ECDSA public point isn't in the expected uncompressed form.");
+  return {jwk:{kty:"EC",crv,x:b64u(Q.subarray(1,1+n)),y:b64u(Q.subarray(1+n)),d:b64u(padLeft(d,n))},params:{name:"ECDSA",namedCurve:crv}};
+}
+function rsaJwk(n,e,d,p,q){
+  // OpenSSH and PuTTY files don't store dp and dq, which browsers need, so they're worked out here.
+  const P=bi(p),Q=bi(q),D=bi(d);
+  if(P<3n||Q<3n)throw fail("The RSA key's primes are invalid. The file looks damaged.");
+  return {jwk:{kty:"RSA",n:b64u(stripZeros(n)),e:b64u(stripZeros(e)),d:b64u(biBytes(D)),p:b64u(biBytes(P)),q:b64u(biBytes(Q)),
+    dp:b64u(biBytes(D%(P-1n))),dq:b64u(biBytes(D%(Q-1n))),qi:b64u(biBytes(modInv(Q,P)))},params:RSA_IMPORT};
+}
+function parseOpenSSH(b){
+  const magic=utf8("openssh-key-v1\0");
+  if(b.length<magic.length||!eq(b.subarray(0,magic.length),magic))throw fail("This doesn't look like a valid OpenSSH private key.");
+  const r=sshReader(b.subarray(magic.length)),cipher=r.str();r.str();r.bytes();const count=r.u32();
+  if(cipher!=="none")throw fail(ENC_MSG.openssh);
+  if(count!==1)throw fail("This file holds "+count+" keys. Only single-key files are supported.");
+  const pubBlob=r.bytes(),s=sshReader(r.bytes());
+  if(s.u32()!==s.u32())throw fail("This OpenSSH key's check bytes don't match. The file looks damaged.");
+  const type=s.str();sshTypeCheck(type);let src;
+  if(type==="ssh-ed25519"){
+    const pub=s.bytes(),sk=s.bytes();
+    if(sk.length!==64||!eq(sk.subarray(32),pub))throw fail("This Ed25519 key's private and public parts don't match. The file looks damaged.");
+    src={pkcs8:ed25519Pkcs8(sk.slice(0,32)),params:{name:"Ed25519"}};
+  }else if(type==="ssh-rsa"){
+    const n=s.mpint(),e=s.mpint(),d=s.mpint();s.mpint();const p=s.mpint(),q=s.mpint();src=rsaJwk(n,e,d,p,q);
+  }else{const curve=s.str(),Q=s.bytes();src=ecJwk(curve,Q,s.mpint());}
+  src.comment=s.str();src.storedPub=pubBlob;src.desc="OpenSSH private key";return src;
+}
+async function hmacSha1(key,msg){
+  const k=await crypto.subtle.importKey("raw",key,{name:"HMAC",hash:"SHA-1"},false,["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC",k,msg));
+}
+async function parsePpk(text){
+  const L=text.replace(/\r/g,"").split("\n"),m=/^PuTTY-User-Key-File-(\d+): (.*)$/.exec(L[0]);
+  if(!m)throw fail("This doesn't look like a valid PuTTY key file.");
+  const ver=+m[1],type=m[2].trim(),h={},blocks={};
+  if(ver!==2&&ver!==3)throw fail("PuTTY key file version "+ver+" isn't supported (only 2 and 3). Load it in a current PuTTYgen and save it again.");
+  for(let i=1;i<L.length;){
+    const mm=/^([A-Za-z-]+): ?(.*)$/.exec(L[i++]);if(!mm)continue;
+    if(mm[1]==="Public-Lines"||mm[1]==="Private-Lines"){const n=parseInt(mm[2],10);if(!(n>=0&&n<10000))throw fail("This PuTTY key file is damaged.");blocks[mm[1]]=L.slice(i,i+n).join("");i+=n;}
+    else h[mm[1]]=mm[2];
+  }
+  const enc=(h["Encryption"]||"").trim();
+  if(enc!=="none")throw fail(ENC_MSG.ppk);
+  sshTypeCheck(type);
+  if(blocks["Public-Lines"]==null||blocks["Private-Lines"]==null||!h["Private-MAC"])throw fail("This PuTTY key file is incomplete.");
+  const pub=b64dec(blocks["Public-Lines"]),priv=b64dec(blocks["Private-Lines"]),comment=h["Comment"]??"";
+  const macData=cat(sstr(type),sstr(enc),sstr(comment),sbytes(pub),sbytes(priv));
+  const mac=ver===3?await hmacSha256EmptyKey(macData)
+    :await hmacSha1(new Uint8Array(await crypto.subtle.digest("SHA-1",utf8("putty-private-key-file-mac-key"))),macData);
+  if(hex(mac)!==h["Private-MAC"].trim().toLowerCase())throw fail("This PuTTY key file failed its integrity (MAC) check, so it has been damaged or edited.");
+  const pr=sshReader(pub),s=sshReader(priv);
+  if(pr.str()!==type)throw fail("This PuTTY key file's header and key data disagree. The file looks damaged.");
+  let src;
+  if(type==="ssh-ed25519"){
+    const le=s.bytes();   // PuTTY stores the 32-byte seed as a little-endian number, so trailing zero bytes may be dropped
+    if(le.length>32)throw fail("This Ed25519 private key is longer than 32 bytes. The file looks damaged.");
+    const seed=new Uint8Array(32);seed.set(le);src={pkcs8:ed25519Pkcs8(seed),params:{name:"Ed25519"}};
+  }else if(type==="ssh-rsa"){
+    const e=pr.mpint(),n=pr.mpint(),d=s.mpint(),p=s.mpint(),q=s.mpint();src=rsaJwk(n,e,d,p,q);
+  }else{const curve=pr.str(),Q=pr.bytes();src=ecJwk(curve,Q,s.mpint());}
+  src.comment=comment;src.storedPub=pub;src.desc="PuTTY .ppk v"+ver+" private key";return src;
+}
+function parseJwk(text){
+  let o;try{o=JSON.parse(text);}catch{throw fail("This looks like JSON but couldn't be read. Check it was copied in full.");}
+  let note="";
+  if(o&&Array.isArray(o.keys)){
+    const ks=o.keys.filter(k=>k&&k.d);
+    if(!ks.length)throw fail(o.keys.length?PUBLIC_MSG:"This key set is empty.");
+    if(ks.length>1)note=" (first of "+ks.length+" private keys in the set)";
+    o=ks[0];
+  }
+  if(!o||typeof o!=="object")throw fail("This JSON isn't a JWK.");
+  if(o.kty==="oct")throw fail("This is a symmetric (secret) JWK, not a key pair.");
+  if(!o.d)throw fail(PUBLIC_MSG);
+  const g=k=>{if(typeof o[k]!=="string")throw fail("This JWK is missing its \""+k+"\" value.");try{return b64uDec(o[k]);}catch{throw fail("This JWK's \""+k+"\" value isn't valid Base64url.");}};
+  let src;
+  if(o.kty==="OKP"){
+    if(o.crv!=="Ed25519")throw unsupported(String(o.crv));
+    src={pkcs8:ed25519Pkcs8(g("d")),params:{name:"Ed25519"}};
+    if(o.x)src.storedPub=cat(sstr("ssh-ed25519"),sbytes(g("x")));
+  }else if(o.kty==="EC"){
+    const c={"P-256":"nistp256","P-384":"nistp384","P-521":"nistp521"}[o.crv];if(!c)throw unsupported(String(o.crv));
+    src=ecJwk(c,cat(Uint8Array.of(4),g("x"),g("y")),g("d"));
+  }else if(o.kty==="RSA"){
+    if(o.oth)throw fail("Multi-prime RSA keys aren't supported.");
+    if(!o.p||!o.q)throw fail("This RSA JWK has no p and q values. That's allowed, but browsers can't import RSA keys without them.");
+    src=rsaJwk(g("n"),g("e"),g("d"),g("p"),g("q"));
+  }else throw unsupported(String(o.kty));
+  src.comment=typeof o.kid==="string"?o.kid:"";src.desc="JWK private key"+note;return src;
+}
+function parsePem(text){
+  const re=/-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/g,blocks=[];let m;
+  while((m=re.exec(text)))blocks.push({label:m[1],body:m[2]});
+  if(!blocks.length)throw fail("The PEM text is incomplete: its BEGIN or END line is missing or doesn't match.");
+  const b=blocks.find(x=>/PRIVATE KEY$/.test(x.label));
+  if(!b){
+    if(blocks.some(x=>/PUBLIC KEY$/.test(x.label)))throw fail(PUBLIC_MSG);
+    if(blocks.some(x=>/CERTIFICATE/.test(x.label)))throw fail("This is a certificate or certificate request, not a private key.");
+    throw fail("No private key was found in this PEM text.");
+  }
+  if(b.label==="ENCRYPTED PRIVATE KEY"||/Proc-Type:\s*4,ENCRYPTED/.test(b.body))throw fail(ENC_MSG.pem);
+  const body=b64dec(b.body.split("\n").filter(l=>!l.includes(":")).join(""));
+  switch(b.label){
+    case "OPENSSH PRIVATE KEY": return parseOpenSSH(body);
+    case "PRIVATE KEY": return derSource(body,"PEM PKCS#8 private key");
+    case "RSA PRIVATE KEY": return derSource(body,"PEM PKCS#1 RSA private key");
+    case "EC PRIVATE KEY": return derSource(body,"PEM SEC1 EC private key");
+    case "DSA PRIVATE KEY": throw unsupported("DSA");
+    default: throw fail("\""+b.label+"\" keys aren't supported here.");
+  }
+}
+async function readKeySource(text){
+  const t=text.trim();
+  if(t.startsWith("PuTTY-User-Key-File-"))return parsePpk(t);
+  if(t.startsWith("{"))return parseJwk(t);
+  if(/^(ssh-\S+|ecdsa-sha2-\S+|sk-\S+)\s+AAAA/.test(t)||t.includes("BEGIN SSH2 PUBLIC KEY"))throw fail(PUBLIC_MSG);
+  if(t.includes("BEGIN SSH2 ENCRYPTED PRIVATE KEY"))throw fail("This is an old ssh.com (SSH2) format key, which isn't supported here. Load it in PuTTYgen and save it as a .ppk first.");
+  if(t.includes("-----BEGIN "))return parsePem(t);
+  if(t.length>=64&&/^[A-Za-z0-9+/=\s]+$/.test(t))return derSource(b64dec(t));
+  throw fail("This isn't a key format this page recognises. Paste a PEM, OpenSSH, PuTTY (.ppk) or JWK private key, or open a DER file.");
+}
+
+const SIGN={ed25519:{name:"Ed25519"},ecdsa:{name:"ECDSA",hash:"SHA-256"},rsa:{name:"RSASSA-PKCS1-v1_5"}};
+function algFromJwk(j){
+  if(j.kty==="OKP")return ["ed25519",ALGS.ed25519];
+  if(j.kty==="EC"){const id={"P-256":"p256","P-384":"p384","P-521":"p521"}[j.crv];return [id,ALGS[id]];}
+  const n=stripZeros(b64uDec(j.n)),bits=(n.length-1)*8+(32-Math.clz32(n[0])),id="rsa"+bits;
+  if(ALGS[id])return [id,ALGS[id]];
+  const weak=bits<2048;
+  return [id,{name:"RSA "+bits,kind:"rsa",file:"id_rsa",ssh:"ssh-rsa",
+    sec:weak?"under 112-bit":"112-bit or more",level:weak?"weak":bits>4096?"strong":"good",rating:weak?"Too weak":bits>4096?"Strong":"Good",
+    note:weak?"Below the 2048-bit minimum. Replace this key with a new one.":"Non-standard size, but fine to use."}];
+}
+// Imports the private key, works out the public key, and checks they belong together.
+async function importSource(src){
+  if(src.params.name==="Ed25519"&&ALGS.ed25519.unsupported)throw fail("This browser doesn't support Ed25519 keys. Try a current version of Chrome, Edge, Firefox or Safari.");
+  let priv;
+  try{priv=src.pkcs8?await crypto.subtle.importKey("pkcs8",src.pkcs8,src.params,true,["sign"])
+                    :await crypto.subtle.importKey("jwk",src.jwk,src.params,true,["sign"]);}
+  catch(e){throw fail("The browser couldn't import this key ("+(e&&e.message||e)+"). The file may be damaged.");}
+  const jwkPriv=await crypto.subtle.exportKey("jwk",priv),pkcs8=new Uint8Array(await crypto.subtle.exportKey("pkcs8",priv));
+  const pj={};for(const f of {OKP:["kty","crv","x"],EC:["kty","crv","x","y"],RSA:["kty","n","e"]}[jwkPriv.kty])pj[f]=jwkPriv[f];
+  const pubKey=await crypto.subtle.importKey("jwk",pj,src.params,true,["verify"]);
+  const spki=new Uint8Array(await crypto.subtle.exportKey("spki",pubKey)),jwkPub=await crypto.subtle.exportKey("jwk",pubKey);
+  const [id,a]=algFromJwk(jwkPriv),msg=crypto.getRandomValues(new Uint8Array(32)),sp=SIGN[a.kind];
+  const sig=await crypto.subtle.sign(sp,priv,msg);
+  if(!await crypto.subtle.verify(sp,pubKey,sig,msg))throw fail("The private key's parts don't fit together, so the file has been damaged or edited.");
+  const k={a,id,pkcs8,spki,jwkPriv,jwkPub},s=sshParts(k);
+  if(src.storedPub&&!eq(s.pubBlob,src.storedPub))throw fail("The public key stored in this file doesn't match its private key, so the file has been damaged or edited.");
+  const fp="SHA256:"+b64(new Uint8Array(await crypto.subtle.digest("SHA-256",s.pubBlob))).replace(/=+$/,"");
+  return {k,desc:src.desc,comment:src.comment||"",fp};
+}
+
+/* ---------- build outputs ---------- */
+// Names with no extension (id_ed25519) are sent as octet-stream, or Chrome saves them as "id_ed25519.txt".
+const txt=(text,name)=>({text,name,data:utf8(text),mime:/\.[^.]+$/.test(name)?"text/plain":"application/octet-stream"});
+const bin=(bytes,name)=>({text:lineWrap(b64(bytes),64),name,data:bytes,mime:"application/octet-stream",binary:true});
+
+async function build(f,k){
+  const a=k.a, L=k.label||"";
+  // With a label: "<label>_<algorithm><suffix>"; without: the standard name.
+  const n=(suffix,standard)=>L?`${L}_${k.id}${suffix}`:standard;
+  switch(f){
+    case "pem": return {priv:txt(pem("PRIVATE KEY",k.pkcs8),n("_private.pem","private_key.pem")),
+                        pub:txt(pem("PUBLIC KEY",k.spki),n("_public.pem","public_key.pem"))};
+    case "pkcs1": return {priv:txt(pem("RSA PRIVATE KEY",pkcs8ToPkcs1(k.pkcs8)),n("_pkcs1_private.pem","rsa_private_key.pem")),
+                          pub:txt(pem("RSA PUBLIC KEY",spkiToPkcs1(k.spki)),n("_pkcs1_public.pem","rsa_public_key.pem"))};
+    case "der": return {priv:bin(k.pkcs8,n("_private.der","private_key.der")),pub:bin(k.spki,n("_public.der","public_key.der"))};
+    case "jwk": return {priv:txt(JSON.stringify(cleanJwk(k.jwkPriv),null,2)+"\n",n("_private.jwk.json","private_key.jwk.json")),
+                        pub:txt(JSON.stringify(cleanJwk(k.jwkPub),null,2)+"\n",n("_public.jwk.json","public_key.jwk.json"))};
+    // OpenSSH always keeps the default names so ssh finds the key without extra config.
+    case "openssh": {const s=sshParts(k);return {priv:txt(opensshPrivate(s,k.comment),a.file),pub:txt(sshPublicLine(s,k.comment),a.file+".pub")};}
+    case "ppk": {const s=sshParts(k);return {priv:txt(await ppkV3(s,k.comment),(L||a.file.replace(/^id_/,""))+".ppk"),
+                                             pub:txt(sshPublicLine(s,k.comment),(L||a.file)+".pub")};}
+  }
+}
+
+/* ---------- UI ---------- */
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function setMsg(target,msg,isErr){target.hidden=!msg;target.textContent=msg||"";target.className="msg"+(isErr?" error":"");}
+const setStatus=(msg,isErr)=>setMsg(statusEl,msg,isErr);
+
+function renderBadge(){
+  const a=ALGS[algSel.value];badgeEl.innerHTML="";
+  const t=el("div");
+  t.append(el("strong",null,a.name),document.createTextNode(" · "+a.sec+" security"),el("div","hint",a.note));
+  if(a.unsupported)t.append(el("div","warn","Not supported in this browser."));
+  badgeEl.append(el("span","pill "+a.level,a.rating),t);
+}
+function renderCompare(){
+  const w=el("div","tablewrap"),t=el("table");
+  t.innerHTML="<thead><tr><th>Algorithm</th><th>Security</th><th>Rating</th><th>Notes</th></tr></thead>";
+  const tb=el("tbody");
+  for(const a of Object.values(ALGS)){
+    const tr=el("tr"),td=el("td");td.append(el("span","pill "+a.level,a.rating));
+    tr.append(el("td",null,a.name),el("td",null,a.sec),td,el("td",null,a.note));tb.append(tr);
+  }
+  t.append(tb);w.append(t);
+  compareEl.append(w,
+    el("p","hint","Security is the approximate classical strength, using NIST's standard equivalences. RSA 4096 isn't in NIST's table, so its figure is an estimate. All options here are currently considered secure; the differences are mainly safety margin, speed and compatibility."),
+    el("p","hint","Quantum computing: none of these algorithms would resist a large future quantum computer, and bigger keys don't change that. Current guidance expects all of them to be phased out during the 2030s in favour of post-quantum algorithms, which this tool doesn't produce."));
+}
+function update(){
+  const a=ALGS[algSel.value];
+  renderBadge();
+  const p1=fmtSel.querySelector('option[value="pkcs1"]');
+  p1.disabled=a.kind!=="rsa";
+  if(p1.disabled&&fmtSel.value==="pkcs1")fmtSel.value="pem";
+  fmtSel.disabled=allChk.checked;
+  fmtNote.textContent=allChk.checked
+    ?"Every format will be shown for one key pair"+(a.kind!=="rsa"?" (PKCS#1 skipped: RSA only).":".")
+    :formatHint(fmtSel.value,a,fileLabel(commentIn.value));
+  genBtn.disabled=!!a.unsupported;
+}
+
+async function copyText(text,btn,ta){
+  try{await navigator.clipboard.writeText(text);}
+  catch{ta.focus();ta.select();try{document.execCommand("copy");}catch{}}
+  const old=btn.textContent;btn.textContent="Copied";setTimeout(()=>btn.textContent=old,1200);
+}
+function download(item){
+  const url=URL.createObjectURL(new Blob([item.data],{type:item.mime}));
+  const a=document.createElement("a");a.href=url;a.download=item.name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function block(title,item,isPriv){
+  const w=el("div"),h=el("h3",null,title+" — "+item.name+" ");
+  if(isPriv)h.append(el("span","warn","keep secret"));
+  const ta=el("textarea");ta.readOnly=true;ta.spellcheck=false;ta.value=item.text;
+  ta.rows=Math.min(14,item.text.split("\n").length+1);
+  const row=el("div","row"),cb=el("button",null,item.binary?"Copy (Base64)":"Copy"),db=el("button",null,"Download");
+  cb.onclick=()=>copyText(item.text,cb,ta);db.onclick=()=>download(item);
+  row.append(cb,db);w.append(h,ta,row);return w;
+}
+function renderFormat(f,r,k,showPriv=true){
+  const c=el("div","card");c.append(el("h2",null,FORMATS[f].name),el("p","hint",formatHint(f,k.a,k.label)));
+  if(showPriv)c.append(block("Private key",r.priv,true));
+  c.append(block("Public key",r.pub,false));return c;
+}
+
+async function generate(){
+  const a=ALGS[algSel.value];
+  genBtn.disabled=true;genBtn.textContent="Generating…";setStatus("Generating "+a.name+" key pair…");
+  try{
+    const kp=await crypto.subtle.generateKey(a.params,true,["sign","verify"]);
+    const [p8,sp,jwkPriv,jwkPub]=await Promise.all([
+      crypto.subtle.exportKey("pkcs8",kp.privateKey),crypto.subtle.exportKey("spki",kp.publicKey),
+      crypto.subtle.exportKey("jwk",kp.privateKey),crypto.subtle.exportKey("jwk",kp.publicKey)]);
+    const k={a,id:algSel.value,label:fileLabel(commentIn.value),pkcs8:new Uint8Array(p8),spki:new Uint8Array(sp),jwkPriv,jwkPub,comment:commentIn.value.trim()||"key"};
+    const fmts=allChk.checked?Object.keys(FORMATS).filter(f=>!(FORMATS[f].rsaOnly&&a.kind!=="rsa")):[fmtSel.value];
+    outEl.innerHTML="";
+    for(const f of fmts)outEl.append(renderFormat(f,await build(f,k),k));
+    clearBtn.hidden=false;setStatus("");
+    outEl.scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){setStatus("Generation failed: "+(e&&e.message?e.message:e),true);}
+  finally{genBtn.textContent="Generate key pair";update();}
+}
+
+/* ---------- Convert tab ---------- */
+const keyIn=$("keyIn"),fileIn=$("fileIn"),detEl=$("detected"),cfmtSel=$("cfmt"),callChk=$("call"),cprivChk=$("cpriv"),
+      ccommentIn=$("ccomment"),convBtn=$("conv"),cclearBtn=$("cclear"),cstatusEl=$("cstatus"),coutEl=$("coutput"),cfmtNote=$("cfmtNote");
+let cur=null,detectSeq=0,detectTimer=0;
+
+function showDetectError(msg){
+  detEl.hidden=false;detEl.innerHTML="";
+  detEl.append(el("span","pill weak","Can't use"),el("div","warn",msg));
+}
+function renderDetected(r){
+  const a=r.k.a,t=el("div");
+  t.append(el("strong",null,a.name),document.createTextNode(" · "+r.desc));
+  const fp=el("div","hint","Fingerprint: ");fp.append(el("span","mono",r.fp));t.append(fp);
+  if(r.comment)t.append(el("div","hint","Comment in file: "+r.comment));
+  t.append(el("div","hint",a.note));
+  detEl.hidden=false;detEl.innerHTML="";detEl.append(el("span","pill "+a.level,a.rating),t);
+}
+async function detect(){
+  const seq=++detectSeq,text=keyIn.value;
+  cur=null;coutEl.innerHTML="";setMsg(cstatusEl,"");
+  cclearBtn.hidden=!text.trim();
+  if(!text.trim()){detEl.hidden=true;cupdate();return;}
+  try{
+    const r=await importSource(await readKeySource(text));
+    if(seq!==detectSeq)return;
+    cur=r;ccommentIn.value=r.comment;renderDetected(r);   // a new key replaces the previous key's comment, even with an empty one
+  }catch(e){
+    if(seq!==detectSeq)return;
+    showDetectError(e&&e.friendly?e.message:"Couldn't read this key: "+(e&&e.message||e));
+  }
+  cupdate();
+}
+function cupdate(){
+  const rsa=!!cur&&cur.k.a.kind==="rsa",p1=cfmtSel.querySelector('option[value="pkcs1"]');
+  p1.disabled=!!cur&&!rsa;
+  if(p1.disabled&&cfmtSel.value==="pkcs1")cfmtSel.value="pem";
+  cfmtSel.disabled=callChk.checked;
+  cfmtNote.textContent=callChk.checked
+    ?"Every format will be shown"+(cur&&!rsa?" (PKCS#1 skipped: RSA only).":".")
+    :cur?formatHint(cfmtSel.value,cur.k.a,fileLabel(ccommentIn.value)):FORMATS[cfmtSel.value].hint;
+  convBtn.textContent=cprivChk.checked?"Convert key pair":"Recreate public key";
+  convBtn.disabled=!cur;
+}
+async function convert(){
+  if(!cur)return;
+  try{
+    const comment=ccommentIn.value.trim(),k={...cur.k,comment,label:fileLabel(comment)},a=k.a;
+    const fmts=callChk.checked?Object.keys(FORMATS).filter(f=>!(FORMATS[f].rsaOnly&&a.kind!=="rsa")):[cfmtSel.value];
+    coutEl.innerHTML="";
+    for(const f of fmts)coutEl.append(renderFormat(f,await build(f,k),k,cprivChk.checked));
+    setMsg(cstatusEl,"");cclearBtn.hidden=false;
+    coutEl.scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){setMsg(cstatusEl,"Conversion failed: "+(e&&e.message?e.message:e),true);}
+}
+async function loadFile(file){
+  if(!file)return;
+  if(file.size>1048576){keyIn.value="";detect();showDetectError("That file is too large to be a key (over 1 MB).");return;}
+  const b=new Uint8Array(await file.arrayBuffer());
+  // Binary DER starts with a SEQUENCE byte (0x30); show it as Base64 so it can be read like pasted text.
+  const isDer=b.length>1&&b[0]===0x30&&((b[1]&0x80)||b[1]+2===b.length);
+  keyIn.value=isDer?lineWrap(b64(b),64):new TextDecoder().decode(b);
+  detect();
+}
+function clearConvert(){
+  keyIn.value="";ccommentIn.value="";cur=null;detectSeq++;
+  coutEl.innerHTML="";detEl.hidden=true;cclearBtn.hidden=true;setMsg(cstatusEl,"");cupdate();
+}
+function showTab(conv){
+  $("tabGen").setAttribute("aria-selected",String(!conv));$("tabConv").setAttribute("aria-selected",String(conv));
+  $("panelGen").hidden=conv;$("panelConv").hidden=!conv;
+}
+
+(async function init(){
+  for(const [id,a] of Object.entries(ALGS))algSel.append(new Option(a.name+" — "+a.rating,id));
+  for(const [id,f] of Object.entries(FORMATS))fmtSel.append(new Option(f.name,id));
+  algSel.value="ed25519";fmtSel.value="pem";
+  renderCompare();
+  algSel.onchange=fmtSel.onchange=allChk.onchange=update;
+  commentIn.oninput=update;
+  genBtn.onclick=generate;
+  clearBtn.onclick=()=>{outEl.innerHTML="";clearBtn.hidden=true;};
+  update();
+
+  for(const [id,f] of Object.entries(FORMATS))cfmtSel.append(new Option(f.name,id));
+  cfmtSel.value="openssh";
+  cfmtSel.onchange=callChk.onchange=cprivChk.onchange=ccommentIn.oninput=cupdate;
+  keyIn.oninput=()=>{clearTimeout(detectTimer);detectTimer=setTimeout(detect,250);};
+  $("openFile").onclick=()=>fileIn.click();
+  fileIn.onchange=()=>{loadFile(fileIn.files[0]);fileIn.value="";};
+  keyIn.addEventListener("dragover",e=>{e.preventDefault();keyIn.classList.add("drag");});
+  keyIn.addEventListener("dragleave",()=>keyIn.classList.remove("drag"));
+  keyIn.addEventListener("drop",e=>{e.preventDefault();keyIn.classList.remove("drag");loadFile(e.dataTransfer.files[0]);});
+  convBtn.onclick=convert;
+  cclearBtn.onclick=clearConvert;
+  $("tabGen").onclick=()=>showTab(false);$("tabConv").onclick=()=>showTab(true);
+  cupdate();
+
+  // Offline download link: only on the website. A saved copy opened from disk doesn't need it,
+  // and browsers ignore the download name for file:// pages.
+  if(location.protocol==="https:"||location.protocol==="http:"){
+    const off=$("offline");off.href=location.origin+location.pathname;off.download="keypair-tool.html";$("offlineWrap").hidden=false;
+  }
+
+  if(!window.isSecureContext||!window.crypto||!crypto.subtle){
+    envErr.hidden=false;
+    envErr.textContent="This browser is blocking secure crypto for this page. Open it from https:// or http://localhost, or try another browser.";
+    genBtn.disabled=true;keyIn.disabled=true;$("openFile").disabled=true;return;
+  }
+  try{await crypto.subtle.generateKey({name:"Ed25519"},false,["sign","verify"]);}
+  catch{
+    ALGS.ed25519.unsupported=true;
+    const o=algSel.querySelector('option[value="ed25519"]');o.disabled=true;o.textContent+=" (not supported in this browser)";
+    algSel.value="p256";
+  }
+  update();
+})();
+</script>
+</body>
+</html>
